@@ -6,7 +6,7 @@ function Menu({ addToCart }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('http://localhost:3001/api/products')
+    axios.get('https://lammet-api.onrender.com/api/products')
       .then(res => {
         setProducts(res.data);
         setLoading(false);

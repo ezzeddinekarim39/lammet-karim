@@ -13,7 +13,7 @@ function AdminDashboard() {
 
   // Use the Render URL if hosting, or localhost if testing
   // CHANGE THIS to your actual Render URL when you deploy!
-  const API_URL = 'http://localhost:3001/api';
+  const API_URL = 'https://lammet-api.onrender.com/api';
   // const API_URL = 'https://lammet-api.onrender.com/api';
 
   useEffect(() => {

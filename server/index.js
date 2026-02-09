@@ -117,14 +117,16 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-// 6. Login Check (Simple Admin Logic)
+// 6. Login Check (Fixed for Frontend Error Handling)
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  // You can change the password here
+
+  // Hardcoded Admin Credentials
   if(username === "admin" && password === "123456") {
     res.json({ success: true });
   } else {
-    res.json({ success: false });
+    // We send 401 (Unauthorized) so the Frontend 'catch' block triggers!
+    res.status(401).json({ success: false, message: "Invalid credentials" });
   }
 });
 

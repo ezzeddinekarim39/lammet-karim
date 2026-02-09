@@ -16,7 +16,7 @@ function Cart({ cart, updateQuantity, removeFromCart, clearCart }) {
 
     try {
         // Send order to backend
-        await axios.post('http://localhost:3001/api/orders', {
+        await axios.post('https://lammet-api.onrender.com/api/orders', {
           customer_name: name,
           customer_phone: phone,
           items: JSON.stringify(cart), // Send items as a text string
