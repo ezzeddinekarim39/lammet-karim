@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { FaHome, FaShoppingCart, FaUserLock } from 'react-icons/fa'; // Import Icons
+import { FaHome, FaShoppingCart } from 'react-icons/fa'; // Removed FaUserLock
 import Menu from './pages/Menu';
 import Cart from './pages/Cart';
 import AdminLogin from './pages/AdminLogin';
@@ -33,7 +33,7 @@ function Layout({ children, cartCount }) {
 
       {showFooter && <Footer />}
 
-      {/* 2. BOTTOM NAVIGATION BAR (Mobile/Tablet Only) */}
+      {/* 2. BOTTOM NAVIGATION BAR (Mobile/Tablet Only) - ADMIN REMOVED */}
       {!isAdminPage && (
         <div className="bottom-nav mobile-only">
           <Link to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
@@ -47,11 +47,6 @@ function Layout({ children, cartCount }) {
               {cartCount > 0 && <span className="badge">{cartCount}</span>}
             </div>
             <span>Cart</span>
-          </Link>
-
-          <Link to="/admin" className={`nav-item ${location.pathname === '/admin' ? 'active' : ''}`}>
-            <FaUserLock size={24} />
-            <span>Admin</span>
           </Link>
         </div>
       )}
@@ -73,7 +68,6 @@ function App() {
       }
       return [...prevCart, { ...product, quantity: 1 }];
     });
-    // Removed alert for smoother mobile experience
   };
 
   // 2. Update Quantity
