@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { FaTrash, FaPlus, FaSignOutAlt, FaUpload, FaclipboardList, FaHamburger } from 'react-icons/fa';
-import { menuData } from '../data/menuData'; // Import your local data file
+import { FaTrash, FaPlus, FaSignOutAlt, FaUpload, FaEdit, FaTimes } from 'react-icons/fa';
+import { menuData } from '../data/menuData';
 
 function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'menu'
 
-  // Updated Form State with new fields (Category, Description)
+  // State for the form
   const [form, setForm] = useState({
     name: '',
     price: '',
@@ -18,15 +18,18 @@ function AdminDashboard() {
     image_url: ''
   });
 
+  // State to track if we are editing an item (stores the ID)
+  const [editingId, setEditingId] = useState(null);
+
   const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
 
-  // Use your Render Backend URL
+  // Your Render Backend URL
   const API_URL = 'https://lammet-api.onrender.com/api';
 
   useEffect(() => {
     fetchData();
-    // Set up auto-refresh for orders every 30 seconds
+    // Auto-refresh orders every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -47,18 +50,7 @@ function AdminDashboard() {
     navigate('/admin');
   };
 
-  const handleDeleteProduct = async (id) => {
-    if(window.confirm("Are you sure you want to delete this item?")) {
-      try {
-        await axios.delete(`${API_URL}/products/${id}`);
-        fetchData(); // Refresh list
-      } catch (err) {
-        alert("Error deleting item");
-      }
-    }
-  };
-
-  // --- 1. HANDLE IMAGE UPLOAD (Converts to Base64) ---
+  // --- 1. HANDLE IMAGE UPLOAD ---
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -76,34 +68,74 @@ function AdminDashboard() {
     };
   };
 
-  // --- 2. ADD NEW PRODUCT (Manual) ---
-  const handleAddProduct = async (e) => {
+  // --- 2. SUBMIT FORM (Add OR Update) ---
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if(!form.name || !form.price || !form.category) {
       return alert("Please fill in Name, Price, and Category.");
     }
 
     try {
-      await axios.post(`${API_URL}/products`, form);
-      setForm({ name: '', price: '', category: '', description: '', image_url: '' }); // Clear form
-      fetchData(); // Refresh list
-      alert("Item added successfully!");
+      if (editingId) {
+        // UPDATE Existing Item
+        await axios.put(`${API_URL}/products/${editingId}`, form);
+        alert("Item updated successfully!");
+        setEditingId(null); // Exit edit mode
+      } else {
+        // CREATE New Item
+        await axios.post(`${API_URL}/products`, form);
+        alert("Item added successfully!");
+      }
+
+      // Reset Form and Refresh List
+      setForm({ name: '', price: '', category: '', description: '', image_url: '' });
+      fetchData();
+
     } catch (err) {
-      alert("Error adding item. Make sure the backend supports these fields.");
+      alert("Error saving item. Check your internet or backend.");
       console.error(err);
     }
   };
 
-  // --- 3. MAGIC IMPORT FUNCTION (Uploads menuData.js) ---
+  // --- 3. START EDITING ---
+  const handleEditClick = (product) => {
+    setEditingId(product.id);
+    setForm({
+      name: product.name,
+      price: product.price,
+      category: product.category,
+      description: product.description || '',
+      image_url: product.image_url || ''
+    });
+    // Scroll to top to see the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // --- 4. CANCEL EDITING ---
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setForm({ name: '', price: '', category: '', description: '', image_url: '' });
+  };
+
+  // --- 5. DELETE ITEM ---
+  const handleDeleteProduct = async (id) => {
+    if(window.confirm("Are you sure you want to delete this item?")) {
+      try {
+        await axios.delete(`${API_URL}/products/${id}`);
+        fetchData();
+      } catch (err) {
+        alert("Error deleting item");
+      }
+    }
+  };
+
+  // --- 6. MAGIC IMPORT ---
   const importMenuToDatabase = async () => {
     if (!window.confirm(`This will upload ${menuData.length} items from your file to the database. Continue?`)) return;
-
-    alert("Starting upload... this might take a few seconds.");
-
+    alert("Starting upload... please wait.");
     let count = 0;
     for (const item of menuData) {
       try {
-        // We map 'image' from file to 'image_url' for database
         await axios.post(`${API_URL}/products`, {
           name: item.name,
           price: item.price,
@@ -112,13 +144,10 @@ function AdminDashboard() {
           description: item.description
         });
         count++;
-      } catch (error) {
-        console.error("Failed to upload:", item.name);
-      }
+      } catch (error) { console.error("Failed:", item.name); }
     }
-
     alert(`Success! Uploaded ${count} items.`);
-    fetchData(); // Refresh list immediately
+    fetchData();
   };
 
   return (
@@ -171,18 +200,30 @@ function AdminDashboard() {
         /* --- TAB 2: MENU MANAGEMENT --- */
         <div className="dashboard-content">
 
-          {/* MAGIC IMPORT BUTTON */}
-          <div style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#e3f2fd', borderRadius: '10px', borderLeft: '5px solid #2196f3' }}>
-            <h3 style={{marginTop:0}}>🚀 Quick Setup</h3>
-            <p>Database empty? Click this to upload your Saj, Crepe, and Cocktail menu instantly.</p>
-            <button onClick={importMenuToDatabase} style={{ backgroundColor: '#2196f3', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight:'bold' }}>
-              Upload Full Menu to Database
-            </button>
-          </div>
+          {/* MAGIC IMPORT BUTTON (Only show if not editing) */}
+          {!editingId && (
+            <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#e3f2fd', borderRadius: '10px', borderLeft: '5px solid #2196f3', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <h4 style={{margin:0}}>🚀 Quick Setup</h4>
+                <p style={{margin:0, fontSize:'0.9rem'}}>Upload full menu (Saj, Crepe, etc) instantly.</p>
+              </div>
+              <button onClick={importMenuToDatabase} style={{ backgroundColor: '#2196f3', color: 'white', padding: '8px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight:'bold' }}>
+                Import Defaults
+              </button>
+            </div>
+          )}
 
-          <div className="form-section">
-            <h3><FaPlus /> Add New Item</h3>
-            <form onSubmit={handleAddProduct}>
+          <div className="form-section" style={{ border: editingId ? '2px solid #ffa502' : '1px solid #ddd' }}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h3>{editingId ? <><FaEdit /> Edit Item</> : <><FaPlus /> Add New Item</>}</h3>
+              {editingId && (
+                <button onClick={handleCancelEdit} style={{background:'#e74c3c', color:'white', border:'none', padding:'5px 10px', borderRadius:'5px', cursor:'pointer'}}>
+                  <FaTimes /> Cancel Edit
+                </button>
+              )}
+            </div>
+
+            <form onSubmit={handleSubmit}>
 
               {/* Row 1: Name & Price */}
               <div style={{display:'flex', gap:'10px'}}>
@@ -210,13 +251,13 @@ function AdminDashboard() {
 
               <div className="form-group">
                 <label>Description</label>
-                <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="e.g. Delicious cheese with ham..." style={{width:'100%', padding:'10px', borderRadius:'5px', border:'1px solid #ccc'}} />
+                <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Ingredients, details..." style={{width:'100%', padding:'10px', borderRadius:'5px', border:'1px solid #ccc'}} />
               </div>
 
               {/* Row 3: Image Upload */}
               <div className="form-group">
                 <label>Product Image</label>
-                <div style={{border:'2px dashed #ccc', padding:'20px', borderRadius:'10px', textAlign:'center', cursor:'pointer', position:'relative', backgroundColor:'#fafafa'}}>
+                <div style={{border:'2px dashed #ccc', padding:'10px', borderRadius:'10px', textAlign:'center', cursor:'pointer', position:'relative', backgroundColor:'#fafafa', display:'flex', alignItems:'center', justifyContent:'center', minHeight:'80px'}}>
                   <input
                     type="file"
                     accept="image/*"
@@ -224,19 +265,17 @@ function AdminDashboard() {
                     style={{opacity:0, position:'absolute', top:0, left:0, width:'100%', height:'100%', cursor:'pointer'}}
                   />
                   {form.image_url ? (
-                    <img src={form.image_url} alt="Preview" style={{height:'100px', borderRadius:'10px', objectFit:'cover'}} />
+                    <img src={form.image_url} alt="Preview" style={{height:'80px', borderRadius:'5px', objectFit:'cover'}} />
                   ) : (
-                    <div style={{color:'#999'}}>
-                      <FaUpload size={20} />
-                      <p>Click to Upload Image</p>
+                    <div style={{color:'#999', fontSize:'0.9rem'}}>
+                      <FaUpload /> Click to Upload
                     </div>
                   )}
                 </div>
-                {isUploading && <p style={{color:'orange', fontSize:'0.8rem'}}>Processing image...</p>}
               </div>
 
-              <button type="submit" className="btn-add" disabled={isUploading}>
-                {isUploading ? "Uploading..." : "Add Product"}
+              <button type="submit" className="btn-add" disabled={isUploading} style={{ backgroundColor: editingId ? '#ffa502' : '#2ecc71' }}>
+                {isUploading ? "Uploading..." : (editingId ? "Update Product" : "Add Product")}
               </button>
             </form>
           </div>
@@ -246,18 +285,24 @@ function AdminDashboard() {
             <h3>Current Menu ({products.length})</h3>
             <div className="product-table-wrapper">
               <table className="product-table">
-                <thead><tr><th>Img</th><th>Name</th><th>Category</th><th>Price</th><th>Action</th></tr></thead>
+                <thead><tr><th>Img</th><th>Name</th><th>Category</th><th>Price</th><th>Actions</th></tr></thead>
                 <tbody>
                   {products.map(p => (
-                    <tr key={p.id}>
+                    <tr key={p.id} style={{backgroundColor: editingId === p.id ? '#fff3cd' : 'white'}}>
                       <td><img src={p.image_url || "https://via.placeholder.com/50"} alt="t" className="table-img" style={{width:'40px', height:'40px', objectFit:'cover', borderRadius:'5px'}}/></td>
                       <td>
                         <strong>{p.name}</strong>
-                        <div style={{fontSize:'0.8rem', color:'#666'}}>{p.description ? p.description.substring(0, 20) + '...' : ''}</div>
                       </td>
                       <td><span style={{backgroundColor:'#eee', padding:'2px 8px', borderRadius:'10px', fontSize:'0.8rem'}}>{p.category || 'General'}</span></td>
                       <td>${p.price}</td>
-                      <td><button onClick={() => handleDeleteProduct(p.id)} className="btn-delete"><FaTrash /></button></td>
+                      <td style={{display:'flex', gap:'5px'}}>
+                        <button onClick={() => handleEditClick(p)} style={{background:'#3498db', color:'white', border:'none', padding:'8px', borderRadius:'5px', cursor:'pointer'}} title="Edit">
+                          <FaEdit />
+                        </button>
+                        <button onClick={() => handleDeleteProduct(p.id)} className="btn-delete" title="Delete">
+                          <FaTrash />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
