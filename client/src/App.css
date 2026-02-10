@@ -511,37 +511,40 @@ input:focus { border-color: var(--secondary); outline: none; }
   border: 2px solid white;
 }
 
-/* --- UPDATE MEDIA QUERY (Replace the previous mobile section) --- */
-@media (max-width: 1024px) { /* Trigger for Mobiles AND Tablets */
+/* ... inside App.css ... */
 
-  /* 1. Hide Desktop Links */
+/* --- UPDATE MEDIA QUERY (Mobiles & Tablets) --- */
+@media (max-width: 1024px) {
+
+  /* 1. Hero Section Fix: Allow height to grow with text */
+  .hero {
+    height: auto;          /* Was fixed at 250px - Change to auto */
+    min-height: 300px;     /* Ensure it's never too small */
+    padding: 60px 20px;    /* Add padding so text has room inside the image */
+    background-position: center;
+  }
+
+  .hero h2 {
+    font-size: 2.2rem;     /* Slightly adjust font size if needed */
+    line-height: 1.2;
+    margin-bottom: 10px;
+  }
+
+  /* ... existing styles for navbar, grid, etc. ... */
   .desktop-only { display: none; }
-
-  /* 2. Show Mobile Bottom Nav */
   .mobile-only { display: flex !important; }
 
-  /* 3. Adjust Top Navbar (Only Logo remains) */
   .navbar {
     height: 60px;
     padding: 0 20px;
-    justify-content: center; /* Center the logo */
+    justify-content: center;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   }
 
   .navbar h1 { font-size: 1.5rem; }
 
-  /* 4. Add padding to bottom so content isn't hidden behind nav */
-  .container {
-    padding-bottom: 90px; /* Space for bottom nav */
-  }
-
-  .footer {
-    padding-bottom: 90px; /* Push footer up */
-  }
-
-  /* 5. Existing Responsive Fixes (Keep these!) */
-  .hero { height: 250px; }
-  .hero h2 { font-size: 1.8rem; }
+  .container { padding-bottom: 90px; }
+  .footer { padding-bottom: 90px; }
 
   .grid {
     display: flex;
@@ -552,6 +555,5 @@ input:focus { border-color: var(--secondary); outline: none; }
   }
 
   .card { width: 100%; max-width: 360px; margin: 0 auto; }
-
   .dashboard-content, .form-grid, .footer-grid { grid-template-columns: 1fr; }
 }
