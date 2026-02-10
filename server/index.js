@@ -5,14 +5,14 @@ const cors = require('cors');
 
 const app = express();
 
-// --- MIDDLEWARE ---
+// --- 1. MIDDLEWARE ---
 app.use(cors()); // Allow Frontend to connect
 
 // INCREASE LIMIT to 50mb so you can upload high-quality images (Base64)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// --- DATABASE CONNECTION (NEON) ---
+// --- 2. DATABASE CONNECTION (NEON POSTGRES) ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -20,18 +20,25 @@ const pool = new Pool({
   }
 });
 
-// --- INITIALIZE TABLES ---
+// --- 3. INITIALIZE TABLES (With Auto-Update) ---
 const initDB = async () => {
   try {
-    // Create Products Table
+    // Create Products Table (if not exists)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         price DECIMAL(10,2) NOT NULL,
+        category TEXT,
+        description TEXT,
         image_url TEXT
       );
     `);
+
+    // --- AUTO-FIX: Add new columns if they are missing ---
+    // This allows you to keep your old data while adding the new features!
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT;`);
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;`);
 
     // Create Orders Table
     await pool.query(`
@@ -44,7 +51,7 @@ const initDB = async () => {
         order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("✅ Database Connected & Tables Ready");
+    console.log("✅ Database Connected & Tables Updated");
   } catch (err) {
     console.error("❌ Database Error:", err);
   }
@@ -52,9 +59,9 @@ const initDB = async () => {
 
 initDB();
 
-// --- API ROUTES ---
+// --- 4. API ROUTES ---
 
-// 1. Get All Products
+// GET All Products
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM products ORDER BY id ASC");
@@ -65,13 +72,25 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// 2. Add New Product (Supports Base64 Images)
+// GET All Orders (For Admin Dashboard)
+app.get('/api/orders', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM orders ORDER BY id DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(err);
+  }
+});
+
+// ADD New Product (POST)
 app.post('/api/products', async (req, res) => {
-  const { name, price, image_url } = req.body;
+  // Now accepts category and description
+  const { name, price, category, description, image_url } = req.body;
   try {
     const result = await pool.query(
-      "INSERT INTO products (name, price, image_url) VALUES ($1, $2, $3) RETURNING *",
-      [name, price, image_url]
+      "INSERT INTO products (name, price, category, description, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [name, price, category, description, image_url]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -80,7 +99,27 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
-// 3. Delete Product
+// --- NEW: UPDATE Product (PUT) ---
+// This fixes the "Error saving item" when editing
+app.put('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, price, category, description, image_url } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE products
+       SET name = $1, price = $2, category = $3, description = $4, image_url = $5
+       WHERE id = $6 RETURNING *`,
+      [name, price, category, description, image_url, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(err);
+  }
+});
+
+// DELETE Product
 app.delete('/api/products/:id', async (req, res) => {
   try {
     await pool.query("DELETE FROM products WHERE id = $1", [req.params.id]);
@@ -91,13 +130,16 @@ app.delete('/api/products/:id', async (req, res) => {
   }
 });
 
-// 4. Place Order
+// PLACE Order
 app.post('/api/orders', async (req, res) => {
   const { customer_name, customer_phone, items, total_amount } = req.body;
   try {
+    // Ensure items is a string (JSON) before saving
+    const itemsString = typeof items === 'object' ? JSON.stringify(items) : items;
+
     const result = await pool.query(
       "INSERT INTO orders (customer_name, customer_phone, items, total_amount) VALUES ($1, $2, $3, $4) RETURNING id",
-      [customer_name, customer_phone, items, total_amount]
+      [customer_name, customer_phone, itemsString, total_amount]
     );
     res.json({ success: true, orderId: result.rows[0].id });
   } catch (err) {
@@ -106,26 +148,12 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-// 5. Get All Orders (For Admin Dashboard)
-app.get('/api/orders', async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM orders ORDER BY order_date DESC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(err);
-  }
-});
-
-// 6. Login Check (Fixed for Frontend Error Handling)
+// LOGIN Check
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-
-  // Hardcoded Admin Credentials
   if(username === "admin" && password === "123456") {
     res.json({ success: true });
   } else {
-    // We send 401 (Unauthorized) so the Frontend 'catch' block triggers!
     res.status(401).json({ success: false, message: "Invalid credentials" });
   }
 });
